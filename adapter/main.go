@@ -1,6 +1,8 @@
 package main
 
 import (
+    "crypto/md5"
+    "encoding/json"
     "fmt"
     "strings"
 )
@@ -95,12 +97,45 @@ func (v *vectorToRasterAdapter) addLine(line Line) {
     }
     fmt.Println("we have", len(v.points), "points")
 }
+func (v *vectorToRasterAdapter) addLineCached(line Line) {
+    hash := func(obj interface{}) [16]byte {
+        bytes, _ := json.Marshal(obj)
+        return md5.Sum(bytes)
+    }
+    h := hash(line)
+    if pts, ok := pointCache[h]; ok {
+        for _, pt := range pts {
+            v.points = append(v.points, pt)
+        }
+        return
+    }
+    left, right := minmax(line.X1, line.X2)
+    top, bottom := minmax(line.Y1, line.Y2)
+    dx := right - left
+    dy := line.Y2 - line.Y1
+    if dx == 0 {
+        for y := top; y <= bottom; y++ {
+            v.points = append(v.points, Point{left, y})
+        }
+    } else if dy == 0 {
+        for x := left; x <= right; x++ {
+            v.points = append(v.points, Point{x, top})
+        }
+    }
+    pointCache[h] = v.points
+    fmt.Println("we have", len(v.points), "points")
+}
+
+// 16 byte because we are going to use md5
+var pointCache = map[[16]byte][]Point{}
 
 //Factory as we are going to construct the raster interface/implement
 func VectorToRaster(vi *VectorImage) RasterImage {
     adapter := vectorToRasterAdapter{}
     for _, line := range vi.Lines {
-        adapter.addLine(line)
+        adapter.addLineCached(line)
+        // adapter.addLine(line) this will run without cache.
+        // it will generate the points everytime we call.
     }
     return adapter // as a RasterImage
 }
@@ -108,5 +143,6 @@ func main() {
     rc := NewRectangle(6, 4)
     // convert rectangle to a raster image.
     a := VectorToRaster(rc)
+    _ = VectorToRaster(rc)
     fmt.Print(DrawPoints(a))
 }
