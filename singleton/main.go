@@ -42,6 +42,10 @@ func readData(path string) (map[string]int, error) {
     return result, nil
 }
 
+type Database interface {
+    GetPopulation(name string) int
+}
+
 func (db *singletonDatabase) GetPopulation(name string) int {
     return db.capitals[name]
 }
@@ -73,8 +77,45 @@ func GetSingletonDatabase() *singletonDatabase {
     })
     return instance
 }
+func GetTotalPopulation(cities []string) int {
+    result := 0
+    for _, city := range cities {
+        result += GetSingletonDatabase().GetPopulation(city)
+    }
+    return result
+}
+func GetTotalPopulationEx(db Database, cities []string) int {
+    result := 0
+    for _, city := range cities {
+        result += db.GetPopulation(city)
+    }
+    return result
+}
+
+type DummyDatabase struct {
+    dummyData map[string]int
+}
+
+func (d *DummyDatabase) GetPopulation(name string) int {
+    if len(d.dummyData) == 0 {
+        d.dummyData = map[string]int{
+            "alpha": 1,
+            "beta":  2,
+            "gamma": 3,
+        }
+    }
+    return d.dummyData[name]
+}
 func main() {
-    db := GetSingletonDatabase()
-    pop := db.GetPopulation("Seoul")
-    fmt.Println("Pop of Seoul = ", pop)
+    // db := GetSingletonDatabase()
+    // pop := db.GetPopulation("Seoul")
+    // fmt.Println("Pop of Seoul = ", pop)
+    // cities := []string{"Seoul", "Mexico City"}
+    // tp := GetTotalPopulationEx(GetSingletonDatabase(), cities)
+    // fmt.Println(tp)
+    names := []string{"alpha", "gamma"}
+    // this is done to avoid calling the singleton directly. as it violates the Dependency inversion principle
+    // we should rely on abstract, not concrete..
+    tp := GetTotalPopulationEx(&DummyDatabase{}, names)
+    fmt.Println(tp == 4)
 }
