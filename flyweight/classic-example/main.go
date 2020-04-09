@@ -15,6 +15,7 @@ func NewUser(fullName string) *User {
 
 var allNames []string
 
+// flyweight is here.
 type User2 struct {
     names []uint8
 }
