@@ -5,14 +5,15 @@ import (
     "fmt"
 )
 
-type Observerable struct {
+type Observable struct {
     subs *list.List
 }
 
-func (o *Observerable) Subscribe(x Observer) {
+func (o *Observable) Subscribe(x Observer) {
     o.subs.PushBack(x)
 }
-func (o *Observerable) Unsubscribe(x Observer) {
+
+func (o *Observable) Unsubscribe(x Observer) {
     for z := o.subs.Front(); z != nil; z = z.Next() {
         if z.Value.(Observer) == x {
             o.subs.Remove(z)
@@ -20,61 +21,68 @@ func (o *Observerable) Unsubscribe(x Observer) {
     }
 }
 
-func (o Observerable) Fire(data interface{}) {
+func (o *Observable) Fire(data interface{}) {
     for z := o.subs.Front(); z != nil; z = z.Next() {
         z.Value.(Observer).Notify(data)
     }
 }
 
-type PropertyChange struct {
-    Name  string // "Age" "Height" property to track change.
-    Value interface{}
-}
 type Observer interface {
     Notify(data interface{})
 }
+
 type Person struct {
-    Observerable
+    Observable
     age int
 }
 
-func (p *Person) Age() int {
-    return p.age
+func NewPerson(age int) *Person {
+    return &Person{Observable{new(list.List)}, age}
 }
+
+type PropertyChanged struct {
+    Name  string
+    Value interface{}
+}
+
+func (p *Person) Age() int { return p.age }
 func (p *Person) SetAge(age int) {
     if age == p.age {
         return
-    }
+    } // no change
+
+    oldCanVote := p.CanVote()
+
     p.age = age
-    p.Fire(PropertyChange{"Age", p.age})
+    p.Fire(PropertyChanged{"Age", p.age})
+
+    if oldCanVote != p.CanVote() {
+        p.Fire(PropertyChanged{"CanVote", p.CanVote()})
+    }
 }
 
-type TrafficManagement struct {
-    o Observerable
+func (p *Person) CanVote() bool {
+    return p.age >= 18
 }
 
-func (t *TrafficManagement) Notify(data interface{}) {
-    if pc, ok := data.(PropertyChange); ok {
-        if pc.Value.(int) >= 16 {
-            fmt.Println("Congrats, you can drive now!")
-            t.o.Unsubscribe(t)
+type ElectrocalRoll struct {
+}
+
+func (e *ElectrocalRoll) Notify(data interface{}) {
+    if pc, ok := data.(PropertyChanged); ok {
+        if pc.Name == "CanVote" && pc.Value.(bool) {
+            fmt.Println("Congratulations, you can vote!")
         }
     }
 }
 
-func NewPerson(age int) *Person {
-    return &Person{
-        Observerable: Observerable{list.New()},
-        age:          age,
-    }
-}
-
 func main() {
-    p := NewPerson(15)
-    t := &TrafficManagement{p.Observerable}
-    p.Subscribe(t)
-    for i := 16; i <= 20; i++ {
-        fmt.Println("Setting the age to", i)
+    p := NewPerson(0)
+    er := &ElectrocalRoll{}
+    p.Subscribe(er)
+
+    for i := 10; i < 20; i++ {
+        fmt.Println("Setting age to", i)
         p.SetAge(i)
     }
 }
